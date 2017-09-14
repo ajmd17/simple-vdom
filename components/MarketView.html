@@ -1,8 +1,8 @@
 <div>
     <h3>Test</h3>
     Listing: {this.listings}
-    <div :test="{{testValue:1}}">
+    <div>
         {this.children}
-        <div data-component="Listing"></div>
+        <div data-component="Listing" :test="{console.log('evaluate test prop'), 123}"></div>
     </div>
 </div>

@@ -1,0 +1,311 @@
+<html>
+    <div data-app="mainApp">
+        <div data-component="MarketView">
+            <span>I am a child</span>
+            <div data-component="MarketView">
+                <span>I am marketview #2.</span>
+            </div>
+            dfsfs
+        </div>
+        <div>
+            <h3>Test2</h3>
+        </div>
+    </div>
+
+    <body>
+        <script
+            src="https://code.jquery.com/jquery-3.2.1.min.js"
+            integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+            crossorigin="anonymous"></script>
+            
+        <script>
+            var TemplateRenderer = {
+                renderString: function (str, props, onPropChanged) {
+                    var context = {
+                        children: [],
+                        set: function (key, value) {
+                            context[key] = value;
+                            // alert children and re-render
+                            //onPropChanged(key, value);
+                        }
+                    };
+
+                    for (var key in props) {
+                        context[key] = props[key];
+                    }
+
+                    var curlyBraceCounter = 0;
+
+                    var str2 = '';
+                    var evalString = '';
+                    
+                    // store expressions (in curly braces)
+                    var expressions = [];
+
+                    for (var i = 0; i < str.length; i++) {
+                        switch (str[i]) {
+                        case '{':
+                            if (curlyBraceCounter > 0) {
+                                evalString += '{';
+                            }
+
+                            curlyBraceCounter++;
+
+                            break;
+
+                        case '}':
+                            curlyBraceCounter--;
+
+                            if (curlyBraceCounter > 0) {
+                                evalString += '}';
+                            } else {
+                                evalString = evalString.trim();
+                                if (evalString != '') {
+                                    var expressionId = expressions.push(evalString) - 1;
+                                    
+                                    //try {
+                                        //var evalResult = function () {
+                                        //    return eval('(' + evalString + ')');
+                                        //}.call(context);
+
+                                        str2 += '<span data-expression-id="' + expressionId + '">';
+                                        //str2 += evalResult;
+                                        str2 += '</span>';
+                                    //} catch (err) {
+                                    //    console.error('Error evaluating `' + evalString + '`:\n', err);
+                                    //}
+                                }
+
+                                evalString = '';
+                            }
+                            
+                            break;
+                            
+                        case '@': // event handler
+                            if (curlyBraceCounter == 0) {
+                                str2 += 'on';
+
+                                var found = false;
+
+                                while (str[i + 1] != '=' && i + 1 < str.length) {
+                                    found = true;
+                                    str2 += str[i + 1];
+                                    i++;
+                                }
+
+                                if (found) {
+                                    str2 += '=';
+                                    i++;
+                                }
+
+                                break;
+                            } // fallthrough
+                        
+                        default:
+                            if (curlyBraceCounter <= 0) {
+                                str2 += str[i];
+                            } else {
+                                evalString += str[i];
+                            }
+                        }
+                    }
+
+                    return {
+                        result: str2,
+                        expressions: expressions
+                    };
+                }
+            };
+        </script>
+        
+        <script>
+            function joinableCallback(cb) {
+                var watchers = [cb];
+
+                var call = function () {
+                    for (var i = 0; i < watchers.length; i++) {
+                        watchers[i].apply(null, arguments);
+                    }
+                };
+
+                call.join = function (cb) {
+                    watchers.push(cb);
+                };
+
+                return call;
+            }
+        </script>
+
+        <script>
+            function htmlEscape(str) {
+                return str
+                    .replace(/&/g, '&amp;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            }
+
+            // I needed the opposite function today, so adding here too:
+            function htmlUnescape(str){
+                return str
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#39;/g, "'")
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&amp;/g, '&');
+            }
+            
+            String.prototype.hashCode = function() {
+                var hash = 0, i, chr;
+                if (this.length === 0) return hash;
+                for (i = 0; i < this.length; i++) {
+                    chr   = this.charCodeAt(i);
+                    hash  = ((hash << 5) - hash) + chr;
+                    hash |= 0; // Convert to 32bit integer
+                }
+                return hash;
+            };
+        
+            function camelCaseToDash(str) {
+                return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+            }
+
+            function dashToCamelCase(str) {
+                return str.replace(/-([a-z])/g, function (g) {
+                    return g[1].toUpperCase();
+                });
+            }
+            
+            var cachedComponents = {
+            
+            };
+            
+            var componentClasses = {
+                // name => ComponentClass
+            };
+            
+            function ComponentClass(name, originalTemplate) {
+                this.name = name;
+                this._originalTemplate = originalTemplate;
+                this.counter = 0;
+            }
+            
+            function Component(componentId, componentClass, element) {
+                this._componentId = componentId;
+                this._componentClass = componentClass;
+                this._element = element;
+            }
+
+            jQuery(function ($) {
+                var $app = $('[data-app]');
+                if ($app.length == 0) {
+                    console.error('Main app container with data-app not found.');
+                    return;
+                }
+
+                function renderComponent($el, parentComponent, cb) {
+                    var props = {};
+
+                    var componentName = $el.attr('data-component');
+                    var isComponent = componentName != null;
+                    
+                    var attributes = $el[0].attributes;
+                    
+                    for (var i = 0; i < attributes.length; i++) {
+                        var nodeName = attributes[i].nodeName;
+                    
+                        var match = /^data\-prop\-(.*)/.exec(nodeName);
+                        if (match) {
+                            nodeName = match[1];
+                        }
+
+                        props[dashToCamelCase(attributes[i].nodeName)] = attributes[i].nodeValue;
+                        props[attributes[i].nodeName] = attributes[i].nodeValue;
+                    }
+
+                    var $children = $el.children();
+                    
+                    if (isComponent) {
+                        var innerText = $el.text().trim();
+                        
+                        if ($children.length == 0 && innerText.length != 0) {
+                            $children = $('<span>').text(innerText);
+                        }
+                    }
+
+                    if ($children.length == 0) {
+                        renderThisComponent();
+                    } else {
+                        var results = [];
+                        var numCompleted = 0;
+                        $children.each(function (i, child) {
+                            var $child = $(child);
+                            renderComponent($child, function ($child) {
+                                results[i] = $child;
+                                numCompleted++;
+                                if (numCompleted == $children.length) {
+                                    props.children = results.reduce(function (accum, el) {
+                                        return accum + el.html();
+                                    }, '');
+                                    renderThisComponent();
+                                }
+                            });
+                        });
+                    }
+
+                    function renderThisComponent() {
+                        if (isComponent) {
+                            function createComponentInstance(componentClass) {
+                                var componentId = componentClass.name + '#' + (++componentClass.counter);
+                                
+                                $el.attr('data-component-id', componentId);
+                                
+                                var componentInstance = new Component(componentId, componentClass, $el);
+                                
+                            }
+                        
+                        
+                            if (componentClasses[componentName] == null) {
+                                componentClasses[componentName] = joinableCallback(function () {
+                                
+                                });
+                            
+                                var componentClass = new ComponentClass(componentName, res);
+                            
+                                $.get('components/' + componentName + '.html').done(function (res) {
+                                    var result = TemplateRenderer.renderString(res, props, function onPropChanged (key, value) {
+                                        props[key] = value;
+                                        $el.html(TemplateRenderer.renderString(res, props, onPropChanged));
+                                    });
+                                    
+                                    
+
+                                    var $templateString = $(templateString);
+                                    renderComponent($templateString, function ($newEl) {
+                                        $el.attr('data-component-id', componentId);
+                                        $el.html($newEl);
+                                        cb($el);
+                                    });
+                                });
+                            
+                            }
+                        
+                            
+                        } else {
+                            cb($el);
+                        }
+                    }
+                }
+
+
+                $app.each(function (i, app) {
+                    $(app).children().each(function (i, el) {
+                        renderComponent($(el), null, function () {
+                        });
+                    });
+                });
+            });
+        </script>
+    </body>
+</html>

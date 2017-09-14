@@ -1,0 +1,508 @@
+<html>
+    <div data-app="MainApp">
+        <div data-component="MarketView" data-listings="{ listings: [1,2,3] }" :listings="{1,2,3}">
+            <span :click="{1}">I am a child</span>
+            <div data-component="MarketView">
+                <span>I am marketview #2.</span>
+            </div>
+            dfsfs
+        </div>
+        <div>
+            <h3>Test2</h3>
+        </div>
+    </div>
+
+    <body>
+        <script
+            src="https://code.jquery.com/jquery-3.2.1.min.js"
+            integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+            crossorigin="anonymous"></script>
+            
+        <script>
+            var TemplateRenderer = {
+                renderString: function (str, props, onPropChanged) {
+                    var context = {
+                        children: [],
+                        set: function (key, value) {
+                            context[key] = value;
+                            // alert children and re-render
+                            //onPropChanged(key, value);
+                        }
+                    };
+
+                    for (var key in props) {
+                        context[key] = props[key];
+                    }
+
+                    var curlyBraceCounter = 0;
+                    var ltCounter = 0;
+
+                    var str2 = '';
+                    var evalString = '';
+                    
+                    // store expressions (in curly braces)
+                    var expressions = [];
+
+                    function isInExpression() {
+                        return curlyBraceCounter > 0;
+                    }
+
+                    function isInAttributes() {
+                        return ltCounter > 0 && !isInExpression();
+                    }
+                    
+                    function isInText() {
+                        return !isInAttributes();
+                    }
+
+                    for (var i = 0; i < str.length; i++) {
+                        function addChar() {
+                            if (curlyBraceCounter <= 0) {
+                                str2 += str[i];
+                            } else {
+                                evalString += str[i];
+                            }
+                        }
+                    
+                        switch (str[i]) {
+                        case '{':
+                            if (isInExpression()) {
+                                evalString += '{';
+                            }
+
+                            curlyBraceCounter++;
+
+                            break;
+
+                        case '}':
+                            curlyBraceCounter--;
+
+                            if (isInExpression()) {
+                                evalString += '}';
+                            } else {
+                                evalString = evalString.trim();
+                                if (evalString != '') {
+                                    var expressionId = expressions.push(evalString) - 1;
+                                    if (isInText()) {
+                                        str2 += '<span data-expression-id="' + expressionId + '"></span>';
+                                    } else {
+                                        str2 += expressionId;
+                                    
+                                        /*console.log(evalString);
+
+                                        try {
+                                            var evalResult = function () {
+                                                return eval('(' + evalString + ')');
+                                            }.call(context);
+
+                                            //str2 += '<span data-expression-id="' + expressionId + '">';
+                                            str2 += evalResult;
+                                            //str2 += '</span>';
+                                        } catch (err) {
+                                            console.error('Error evaluating `' + evalString + '`:\n', err);
+                                        }*/
+                                    }
+                                }
+
+                                evalString = '';
+                            }
+                            
+                            break;
+                            
+                        /*case '@': // event handler
+                            if (curlyBraceCounter == 0) {
+                                str2 += 'on';
+
+                                var found = false;
+
+                                while (str[i + 1] != '=' && i + 1 < str.length) {
+                                    found = true;
+                                    str2 += str[i + 1];
+                                    i++;
+                                }
+
+                                if (found) {
+                                    str2 += '=';
+                                    i++;
+                                }
+
+                                break;
+                            } // fallthrough*/
+                        case '<':
+                            if (!isInExpression()) {
+                                ltCounter++;
+                            }
+                            addChar();
+                            break;
+
+                        case '>':
+                            if (!isInExpression()) {
+                                ltCounter--;
+                            }
+                            addChar();
+                            break;
+
+                        case ':':
+                            if (isInAttributes()) {
+                                var ident = '';
+                                console.log('test: ', str[i+1]);
+                                while (i + 1 < str.length && /[A-Za-z\-_]/.test(str[i + 1])) {
+                                    ident += str[i + 1];
+                                    i++;
+                                }
+                                
+                                console.log('ident = ', ident);
+                            
+                                break;
+                            }
+                        // fallthrough
+
+                        default:
+                            addChar();
+                        }
+                    }
+
+                    return {
+                        html: str2,
+                        expressions: expressions
+                    };
+                }
+            };
+        </script>
+
+        <script>
+            function joinableCallback(cb) {
+                var watchers = [cb];
+
+                var call = function () {
+                    for (var i = 0; i < watchers.length; i++) {
+                        watchers[i].apply(null, arguments);
+                    }
+                };
+
+                call.join = function (cb) {
+                    watchers.push(cb);
+                };
+
+                return call;
+            }
+        </script>
+
+        <script>
+            function htmlEscape(str) {
+                return str
+                    .replace(/&/g, '&amp;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            }
+
+            // I needed the opposite function today, so adding here too:
+            function htmlUnescape(str){
+                return str
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#39;/g, "'")
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&amp;/g, '&');
+            }
+            
+            String.prototype.hashCode = function() {
+                var hash = 0, i, chr;
+                if (this.length === 0) return hash;
+                for (i = 0; i < this.length; i++) {
+                    chr   = this.charCodeAt(i);
+                    hash  = ((hash << 5) - hash) + chr;
+                    hash |= 0; // Convert to 32bit integer
+                }
+                return hash;
+            };
+        
+            function camelCaseToDash(str) {
+                return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+            }
+
+            function dashToCamelCase(str) {
+                return str.replace(/-([a-z])/g, function (g) {
+                    return g[1].toUpperCase();
+                });
+            }
+            
+            var cachedComponents = {
+            
+            };
+            
+            var componentClasses = {
+                // name => ComponentClass
+            };
+            
+            function ComponentClass(name, html, originalTemplate) {
+                this.name = name;
+                this.html = html;
+                this.expressions = [];
+                this._originalTemplate = originalTemplate;
+                this.counter = 0;
+            }
+            
+            ComponentClass.prototype.newInstance = function (instance) {
+                this.counter++;
+                var id = this.name + '#' + this.counter;
+                instance._componentId = id;
+                cachedComponents[id] = instance;
+                return id;
+            };
+
+            ComponentClass.prototype.evaluateExpressionsForProps = function (props) {
+                return this.expressions.map(function (x) { return x.call(props); });
+            };
+
+            function Component(componentId, componentClass, element) {
+                this._componentId = componentId;
+                this._componentClass = componentClass;
+                this._element = element;
+                this.props = {};
+            }
+            
+            Component.prototype.triggerUpdate = function () {
+                this.render();
+            };
+
+            Component.prototype.render = function (cb) {
+                console.log('render ' + this._componentId);
+                var $html = $(this._componentClass.html);
+                var $element = $(this._element);
+                var results = this._componentClass.evaluateExpressionsForProps(this.props);
+                results.forEach(function (result, i) {
+                    var $exprTag = $html.find('[data-expression-id="' + i + '"]');
+                    if ($exprTag.length != 0) {
+                        $exprTag.html(result);
+                    } else {
+                        //throw new Error('No expression tag found for expression `' + i + '`');
+                    }
+                });
+
+                var $allChildren = $html.children(':not([data-component])').add($html.find('[data-component]').filter(function () {
+                    return $(this).parentsUntil($element, '[data-component]').length == 0;
+                }));
+                var numCompleted = 0;
+
+                function nextChild() {
+                    numCompleted++;
+                    if (numCompleted == $allChildren.length) {
+                        // done
+                        $element.html($html);
+
+                        if (typeof cb !== 'undefined') {
+                            cb();
+                        }
+                    }
+                }
+
+                // get child components and render them
+                $allChildren.each(function (i, el) {
+                    var $el = $(el);
+                    
+                    if ($el.attr('data-component-id') != null) {
+                        var childComponentId = $el.attr('data-component-id');
+                        if (childComponentId == null) {
+                            throw new Error('data-component-id not set on element `' + $el.html() + '`');
+                        }
+                        
+                        var childComponent = cachedComponents[childComponentId];
+                        if (childComponent == null) {
+                            throw new Error('child component with id `' + childComponentId + '` not found');
+                        }
+
+                        childComponent.render(function () {
+                            nextChild();
+                        });
+                    } else {
+                        renderComponent($el, function () {
+                            nextChild();
+                        });
+                    }
+                });
+            };
+            
+            Component.prototype.applyProps = function (props, suppressUpdate) {
+                for (var key in props) {
+                    this.props[key] = props[key];
+                }
+                
+                if (!suppressUpdate) {
+                    this.triggerUpdate();
+                }
+            };
+
+            Component.prototype.triggerExpression = function (expressionId) {
+                var expr = this._componentClass.expressions[expressionId];
+                if (expr == null) {
+                    throw new Error('No expression with id `' + expressionId + '`');
+                }
+
+                var exprResult = expr.call(this.props);
+
+                var $element = $(this._element);
+                var $exprTag = $element.find('[data-expression-id="' + expressionId + '"]');
+                if ($exprTag.length == 0) {
+                    throw new Error('No expression tag found for expression `' + expressionId + '`');
+                }
+
+                $exprTag.html(exprResult);
+            };
+
+            function renderComponent($el, cb) {
+                var props = {};
+
+                var componentName = $el.attr('data-component');
+                var isComponent = componentName != null;
+                
+                var attributes = $el[0].attributes;
+                
+                for (var i = 0; i < attributes.length; i++) {
+                    var nodeName = attributes[i].nodeName;
+                
+                    var match = /^data\-prop\-(.*)/.exec(nodeName);
+                    if (match) {
+                        nodeName = match[1];
+                    }
+
+                    props[dashToCamelCase(attributes[i].nodeName)] = attributes[i].nodeValue;
+                    props[attributes[i].nodeName] = attributes[i].nodeValue;
+                }
+
+                props.children = $el.html();
+
+                /*var $children = $el.children();
+                
+                if (isComponent) {
+                    var innerText = $el.text().trim();
+                    
+                    if ($children.length == 0 && innerText.length != 0) {
+                        $children = $('<span>').text(innerText);
+                    }
+                }
+
+                if ($children.length == 0) {
+                    renderThisComponent();
+                } else {
+                    var results = [];
+                    var numCompleted = 0;
+                    $children.each(function (i, child) {
+                        var $child = $(child);
+                        renderComponent($child, function ($child) {
+                            results[i] = $child;
+                            numCompleted++;
+                            if (numCompleted == $children.length) {
+                                props.children = results.reduce(function (accum, el) {
+                                    return accum + el[0].outerHTML;
+                                }, '');
+                                renderThisComponent();
+                            }
+                        });
+                    });
+                }*/
+                renderThisComponent();
+
+                function renderThisComponent() {
+                    if (isComponent) {
+                        function createComponentInstance(componentClass, cb) {
+
+                            var componentInstance = new Component(null, componentClass, $el);
+                            var componentId = componentClass.newInstance(componentInstance);
+                            componentInstance.applyProps(props, true);
+                            componentInstance.render(function () {
+                                var newProps = {};
+                            
+                                var attributes = $el[0].attributes;
+                                for (var i = 0; i < attributes.length; i++) {
+                                    var attrName = attributes[i].name || attributes[i].nodeName;
+                                    var attrValue = attributes[i].value || attributes[i].nodeValue;
+                                    
+                                    var match = /^:(.*)/.exec(attrName);
+
+                                    if (match != null) {
+                                        newProps[match[1]] = attrValue;
+                                        // bind prop name to id
+                                        $el.attr('data-bind-prop-' + match[1], attrValue);
+                                    }
+                                }
+
+                                /*if (cachedComponents[componentId] != null) {
+                                    throw new Error('Component with id `' + componentId + '` already created');
+                                }*/
+                                $el.attr('data-component-id', componentId);
+                                cb($el);
+                            });
+
+                            return componentInstance;
+                        }
+
+                        if (componentClasses[componentName] == null) {
+                            componentClasses[componentName] = joinableCallback(function (componentClass) {
+                                createComponentInstance(componentClass, cb);
+                            });
+
+                            $.get('components/' + componentName + '.html').done(function (res) {
+                                var componentClass = new ComponentClass(componentName, null, null);
+                                var result = TemplateRenderer.renderString(res, props, function onPropChanged (key, value) {
+                                    props[key] = value;
+                                    //$el.html(TemplateRenderer.renderString(res, props, onPropChanged));
+                                });
+                                
+                                componentClass.html = result.html;
+                                componentClass._originalTemplate = res;
+                                componentClass.expressions = result.expressions.map(function (x) {
+                                    return new Function('return ' + x);
+                                });
+
+                                componentClasses[componentName](componentClass);
+                                componentClasses[componentName] = componentClass;
+                            });
+                        } else {
+                            if (typeof componentClasses[componentName].join === 'function') {
+                                componentClasses[componentName].join(function (componentClass) {
+                                    createComponentInstance(componentClass, cb);
+                                });
+                            } else {
+                                createComponentInstance(componentClasses[componentName], cb);
+                            }
+                        }
+                    
+                        
+                    } else {
+                        cb($el);
+                    }
+                }
+            }
+
+            jQuery(function ($) {
+                var $app = $('[data-app]');
+                if ($app.length == 0) {
+                    console.error('Main app container with data-app not found.');
+                    return;
+                }
+
+                function render() {
+                    console.log('render');
+                    $app.each(function (i, app) {
+                        $(app).children().each(function (i, el) {
+                            renderComponent($(el), function () {
+                            });
+                        });
+                    });
+                }
+                
+                render();
+                /*setInterval(function () {
+                    cachedComponents = {};
+                    componentClasses = {};
+                    for (var key in cachedComponents) {
+                        cachedComponents[key].render();
+                    }
+                },5000);*/
+            });
+        </script>
+    </body>
+</html>

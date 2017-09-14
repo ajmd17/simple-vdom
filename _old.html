@@ -1,0 +1,104 @@
+
+        
+        <script>
+            function parser(str) {
+                var tokens = [];
+                var index = 0;
+                
+                var TokenType = {
+                    OPEN_EXPR: 1,
+                    CLOSE_EXPR: 2,
+                    OPEN_TAG: 3,
+                    CLOSE_TAG: 4,
+                    OTHER_TEXT
+                };
+                
+                function peekChar() {
+                    return str[index];
+                }
+                
+                function readChar() {
+                    return strChar[index++];
+                }
+                
+                function matchChar(ch, read) {
+                    if (peekChar() == ch) {
+                        if (read) readChar();
+                        
+                        return true;
+                    }
+
+                    return false;
+                }
+                
+                function hasNext() {
+                    return index < str.length;
+                }
+                
+                var isInScriptTag = false;
+                
+                function readIdentifier() {
+                    var str = '';
+                    while (hasNext() && /[a-z0-9\-_]/i.test(peekChar())) {
+                        str += readChar();
+                    }
+                    if (str == '') {
+                        return null;
+                    } else {
+                        return str;
+                    }
+                }
+                
+                function parseAttributes() {
+                    var attribs = {};
+                }
+                
+                function getToken(ch) {
+                    switch (ch) {
+                        case '{': return { type: TokenType.OPEN_EXPR, value: readChar() };
+                        case '}': return { type: TokenType.CLOSE_EXPR, value: readChar() };
+                        case '<': {
+                            var tagValue = '';
+                        
+                            readChar();
+                            var isClosingTag = false;
+                            if (matchChar('/', true)) {
+                                isClosingTag = true;
+                            }
+                            while (hasNext() && !matchChar('>', true)) {
+                                tagValue += readChar();
+
+                                if (matchChar('/', true)) {
+                                    isClosingTag = true;
+                                    readChar(); // read the '>'
+                                    break;
+                                }
+                            }
+                            
+                            if (tagValue == 'script') {
+                                if (isClosingTag) {
+                                    isInScriptTag = false;
+                                }
+                            
+                            }
+                            
+                            return { type: isClosingTag ? TokenType.CLOSE_TAG : TokenType.OPEN_TAG, value: tagValue };
+                        }
+                            
+                    }
+                }
+                
+                while (hasNext()) {
+                    var ch = peekChar();
+                    
+                    switch (ch) {
+                    case '{':
+                        
+                    
+                    }
+                
+                }
+            };
+        
+            
+        </script>
